@@ -14,7 +14,7 @@ class KustoVectorStore(VectorStore):
     
     def __init__(
         self,
-        cluster_uri: str,
+        connection: str | KustoConnectionStringBuilder,
         database: str,
         collection_name: str,
         embedding: Optional[Embeddings] = None,
@@ -26,13 +26,13 @@ class KustoVectorStore(VectorStore):
         """Initialize KustoVectorStore.
         
         Args:
-            cluster_uri: Kusto cluster URI
+            connection: Kusto connection string or KustoConnectionStringBuilder. If a string is provided, it is treated as the cluster URI and DefaultAzureCredential is used.
             database: Database name
             collection_name: Table name for the vector collection
             embedding: Embeddings instance for query embedding
             **kwargs: Additional arguments
         """
-        self.cluster_uri = cluster_uri
+        self.connection = connection
         self.database = database
         self.collection_name = collection_name
         self._embedding = embedding
@@ -40,13 +40,18 @@ class KustoVectorStore(VectorStore):
         self.id_column = id_column
         self.content_column = content_column
 
-        # Initialize Kusto client
-        credential = DefaultAzureCredential(
-            exclude_workload_identity_credential=True,
-            exclude_shared_token_cache_credential=True,
-            exclude_interactive_browser_credential=False
-        )
-        kcsb = KustoConnectionStringBuilder.with_azure_token_credential(cluster_uri, credential)
+        if isinstance(connection, str):
+            # Initialize Kusto client
+            credential = DefaultAzureCredential(
+                exclude_workload_identity_credential=True,
+                exclude_shared_token_cache_credential=True,
+                exclude_interactive_browser_credential=False
+            )
+            kcsb = KustoConnectionStringBuilder.with_azure_token_credential(connection, credential)
+        elif isinstance(connection, KustoConnectionStringBuilder):
+            kcsb = connection
+        else:
+            raise ValueError("Connection must be a string or KustoConnectionStringBuilder")
         self._client = KustoClient(kcsb)
     
     @property
